@@ -1,0 +1,5 @@
+{
+  "name": "Image Detailer",
+  "description": "An application that uses AI to provide a detailed description of any uploaded image. Simply upload a photo and let the model describe every detail.",
+  "requestFramePermissions": []
+}
