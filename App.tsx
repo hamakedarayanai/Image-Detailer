@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { describeImage } from './services/geminiService';
 import Header from './components/Header';
 import ImageUploader from './components/ImageUploader';
@@ -12,6 +12,9 @@ const App: React.FC = () => {
   const [description, setDescription] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [progress, setProgress] = useState<number>(0);
+  const timerRef = useRef<number | null>(null);
+
 
   const handleImageUpload = (file: File) => {
     handleClear();
@@ -37,6 +40,24 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError('');
     setDescription('');
+    setProgress(0);
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    // Simulate progress
+    timerRef.current = window.setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 95) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          return 95;
+        }
+        // Simulate slower progress towards the end
+        const increment = prev < 70 ? Math.random() * 10 + 2 : Math.random() * 3 + 1;
+        return Math.min(prev + increment, 95);
+      });
+    }, 400);
 
     try {
       // The base64 string from FileReader includes the data URL prefix, which we need to remove.
@@ -45,11 +66,21 @@ const App: React.FC = () => {
       const mimeType = uploadedFile.file.type;
       
       const result = await describeImage(base64Data, mimeType);
-      setDescription(result);
+      
+      if (timerRef.current) clearInterval(timerRef.current);
+      setProgress(100);
+
+      // Wait for the 100% animation to finish before showing the result
+      setTimeout(() => {
+        setDescription(result);
+        setIsLoading(false);
+      }, 500);
+
     } catch (err: unknown) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      // The error message from geminiService is now user-friendly.
       const message = err instanceof Error ? err.message : 'An unknown error occurred.';
-      setError(`Failed to generate description: ${message}`);
-    } finally {
+      setError(message);
       setIsLoading(false);
     }
   }, [uploadedFile]);
@@ -59,6 +90,11 @@ const App: React.FC = () => {
     setDescription('');
     setError('');
     setIsLoading(false);
+    setProgress(0);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     const fileInput = document.getElementById('file-upload') as HTMLInputElement;
     if(fileInput) fileInput.value = '';
   };
@@ -101,8 +137,8 @@ const App: React.FC = () => {
 
           <div className="w-full">
             {isLoading ? (
-              <div className="flex items-center justify-center h-64 bg-base-200 rounded-lg">
-                <Loader />
+              <div className="flex items-center justify-center h-64 bg-base-200 rounded-lg p-4">
+                <Loader progress={progress} />
               </div>
             ) : (
               <DescriptionDisplay description={description} />
